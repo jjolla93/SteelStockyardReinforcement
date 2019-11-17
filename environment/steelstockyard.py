@@ -10,7 +10,7 @@ class Plate(object):
         self.id = str(plate_id)
         self.inbound = inbound
         if outbound == -1:  # 강재 데이터가 없으면 임의로 출고일 생성
-            self.outbound = randint(0, 5)
+            self.outbound = randint(1, 5)
 
 
 # 강재 적치 위치 결정 환경
@@ -187,7 +187,7 @@ class LocatingDisplay(object):
                         game_exit = True
                         break
                 if action != -1:
-                    _, reward, done = self.space.action(action)
+                    _, reward, done = self.space.step(action)
                     self.total += reward
                 if done:
                     self.restart()
