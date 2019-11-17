@@ -5,8 +5,9 @@ import time
 
 
 class Work(object):
-    def __init__(self, work_id=None, lead_time=1, max_days=4):
+    def __init__(self, work_id=None, block=None, lead_time=1, max_days=4):
         self.id = str(work_id)
+        self.block = block
         if lead_time == -1:
             self.lead_time = randint(1, 1 + max_days // 3)
         else:
@@ -14,10 +15,11 @@ class Work(object):
 
 
 class Scheduling(object):
-    def __init__(self, num_days=4, inbound_works=None, display_env=False):
+    def __init__(self, num_days=4, num_blocks=0, inbound_works=None, display_env=False):
         self.action_space = 3
         self.num_days = num_days
         self.num_work = len(inbound_works)
+        self.num_block = num_blocks
         self.empty = 0
         self.step = 0
         self.inbound_works = inbound_works
@@ -27,7 +29,7 @@ class Scheduling(object):
         self._location = 0
         # self.yard = np.full([max_stack, num_pile], self.empty)
         if display_env:
-            display = LocatingDisplay(self, num_days, self.num_work)
+            display = LocatingDisplay(self, num_days, self.num_block)
             display.game_loop_from_space()
 
     def action(self, action):
@@ -71,7 +73,7 @@ class Scheduling(object):
             else:
                 cell = confirmed
             for j in range(self.inbound_works[i].lead_time):
-                state[i, location + j] = cell
+                state[self.inbound_works[i].block, location + j] = cell
         return state
 
 
@@ -224,10 +226,11 @@ class LocatingDisplay(object):
 
 
 if __name__ == '__main__':
-    days = 5
+    days = 10
     blocks = 5
-    inbounds = [Work('Work' + str(i), lead_time=-1, max_days=days) for i in range(blocks)]
-    env = Scheduling(num_days=days, inbound_works=inbounds, display_env=True)
+    #inbounds = [Work('Work' + str(i), lead_time=-1, max_days=days) for i in range(blocks)]
+    inbounds = [Work('Work' + str(i), i // 2, lead_time=-1, max_days=days) for i in range(10)]
+    env = Scheduling(num_days=days, num_blocks=blocks, inbound_works=inbounds, display_env=True)
     '''
     s, r, d = env.action(0)
     print(s)

@@ -1,4 +1,5 @@
 from random import randint
+import numpy as np
 import pygame
 import time
 
@@ -18,31 +19,36 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         self.action_space = num_pile  # 가능한 action 수는 파일의 수로 설정
         self.max_stack = max_stack  # 한 파일에 적치 가능한 강재의 수
         self.empty = 0  # 빈 공간의 상태 표현 값
-        self.step = 0
+        self.stage = 0
         self.inbound_plates = inbound_plates
         self.inbound_clone = inbound_plates[:]
         self.plates = [[] for _ in range(num_pile)]  # 각 파일을 빈 리스트로 초기화
+        self.n_features = max_stack * num_pile
         # self.yard = np.full([max_stack, num_pile], self.empty)
         if display_env:  # 환경을 게임엔진으로 가시화하는 용도. 학습용시에는 사용하지 않음
             display = LocatingDisplay(self, num_pile, max_stack, 2)
             display.game_loop_from_space()
 
-    def action(self, action):
+    def step(self, action):
         done = False
-        reward = 0
-        inbound = self.inbound_plates.pop()
-        self.plates[action].append(inbound)
-        reward = self._calculate_reward(action)
-        self.step += 1
+        inbound = self.inbound_plates.pop()  # 입고 강재 리스트 가장 위에서부터 강재를 하나씩 입고
+        if len(self.plates[action]) == self.max_stack:  # 적치 강재가 최대 높이를 초과하면 실패로 간주
+            done = True
+            reward = -1.0
+        else:
+            self.plates[action].append(inbound)  # action 에 따라서 강재를 적치
+            reward = self._calculate_reward(action)  # 해당 action 에 대한 보상을 계산
+            self.stage += 1
         if len(self.inbound_plates) == 0:
             done = True
-        next_state = []
+        next_state = self._get_state()  # 쌓인 강재들 리스트에서 state 를 계산
         return next_state, reward, done
 
     def reset(self):
         self.inbound_plates = self.inbound_clone[:]
         self.plates = [[] for _ in range(self.action_space)]
-        self.step = 0
+        self.stage = 0
+        return self._get_state()
 
     def _calculate_reward(self, action):
         pile = self.plates[action]
@@ -54,15 +60,21 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
             if i + max_move > len(pile):
                 break
             for upper in pile[i + 1:]:
-                if plate.outbound < upper.outbound:
+                if plate.outbound < upper.outbound:  # 하단의 강재 적치 기간이 짧은 경우 예상 크레인 횟수 증가
                     move += 1
-            if move > max_move:
+            if move > max_move:  # 파일 내의 강재들 중 반출 시 예상 크레인 사용 횟수가 최대인 강재를 기준으로 보상 계산
                 max_move = move
-        reward = 2
+        reward = 2  # 예상 크레인 사용 횟수가 0인 경우 최대인 2의 보상
         if max_move != 0:
-            reward = 1 / max_move
+            reward = 1 / max_move  # 예상 크레인 사용 횟수의 역수로 보상 계산
         return reward
 
+    def _get_state(self):
+        state = np.full([self.max_stack, self.action_space], self.empty)
+        for i, pile in enumerate(self.plates):
+            for j, plate in enumerate(pile):
+                state[j, i] = plate.outbound - plate.inbound
+        return state.flatten()
 
 
 # 환경을 가시화하는 용도, 사람이 action 을 입력해야하므로 학습시에는 실행하지 않음
