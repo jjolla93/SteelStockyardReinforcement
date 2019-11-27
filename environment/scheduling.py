@@ -5,9 +5,11 @@ import time
 
 
 class Work(object):
-    def __init__(self, work_id=None, block=None, lead_time=1, max_days=4):
+    def __init__(self, work_id=None, block=None, lead_time=1, earliest_start=-1, latest_finish=-1, max_days=4):
         self.id = str(work_id)
         self.block = block
+        self.earliest_start = earliest_start
+        self.latest_finish = latest_finish
         if lead_time == -1:
             self.lead_time = randint(1, 1 + max_days // 3)
         else:
@@ -66,12 +68,17 @@ class Scheduling(object):
         state = np.full([self.num_work, self.num_days], 0)
         moving = 1
         confirmed = 2
+        constraint = 3
         cell = 0
         for i, location in enumerate(self.works):
             if self._ongoing == i:
                 cell = moving
             else:
                 cell = confirmed
+            if self.inbound_works[i].earliest_start != -1:
+                state[self.inbound_works[i].block, self.inbound_works[i].earliest_start] = constraint
+            if self.inbound_works[i].latest_finish != -1:
+                state[self.inbound_works[i].block, self.inbound_works[i].latest_finish] = constraint
             for j in range(self.inbound_works[i].lead_time):
                 state[self.inbound_works[i].block, location + j] = cell
         return state
@@ -216,7 +223,9 @@ class LocatingDisplay(object):
                     rgb = self.green
                 elif state[i, j] == 2:
                     rgb = self.blue
-                self.block(j, i, space.inbound_works[i].id, rgb, x_init=self.x_init)
+                elif state[i, j] == 3:
+                    rgb = self.red
+                self.block(j, i, '', rgb, x_init=self.x_init)
 
     def message_display(self, text, x, y):
         large_text = pygame.font.Font(self.font, 20)
@@ -226,10 +235,22 @@ class LocatingDisplay(object):
 
 
 if __name__ == '__main__':
-    days = 10
+    days = 15
     blocks = 5
     #inbounds = [Work('Work' + str(i), lead_time=-1, max_days=days) for i in range(blocks)]
-    inbounds = [Work('Work' + str(i), i // 2, lead_time=-1, max_days=days) for i in range(10)]
+    #inbounds = [Work('Work' + str(i), i // 2, lead_time=-1, max_days=days) for i in range(10)]
+    inbounds = []
+    inbounds.append(Work('Work0', 0, 2, -1, -1, days))
+    inbounds.append(Work('Work1', 0, 1, -1, 5, days))
+    inbounds.append(Work('Work2', 1, 1, 1, -1, days))
+    inbounds.append(Work('Work3', 1, 3, -1, 8, days))
+    inbounds.append(Work('Work4', 2, 2, 4, -1, days))
+    inbounds.append(Work('Work5', 2, 2, -1, 10, days))
+    inbounds.append(Work('Work6', 3, 1, 2, -1, days))
+    inbounds.append(Work('Work7', 3, 3, -1, 12, days))
+    inbounds.append(Work('Work8', 4, 2, 4, -1, days))
+    inbounds.append(Work('Work9', 4, 2, -1, 14, days))
+    inbounds.append(Work('Work9', 4, 2, -1, 14, days))
     env = Scheduling(num_days=days, num_blocks=blocks, inbound_works=inbounds, display_env=True)
     '''
     s, r, d = env.action(0)
