@@ -2,15 +2,7 @@ from random import randint
 import numpy as np
 import pygame
 import time
-
-
-# 강재 정보 클래스 id, 입출고일정 포함
-class Plate(object):
-    def __init__(self, plate_id=None, inbound=0, outbound=1):
-        self.id = str(plate_id)
-        self.inbound = inbound
-        if outbound == -1:  # 강재 데이터가 없으면 임의로 출고일 생성
-            self.outbound = randint(1, 5)
+import environment.plate as plate
 
 
 # 강재 적치 위치 결정 환경
@@ -20,6 +12,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         self.max_stack = max_stack  # 한 파일에 적치 가능한 강재의 수
         self.empty = 0  # 빈 공간의 상태 표현 값
         self.stage = 0
+        self.current_date = 0
         self.inbound_plates = inbound_plates
         self.inbound_clone = inbound_plates[:]
         self.plates = [[] for _ in range(num_pile)]  # 각 파일을 빈 리스트로 초기화
@@ -31,7 +24,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
 
     def step(self, action):
         done = False
-        inbound = self.inbound_plates.pop()  # 입고 강재 리스트 가장 위에서부터 강재를 하나씩 입고
+        inbound = self.inbound_plates.pop(0)  # 입고 강재 리스트 가장 위에서부터 강재를 하나씩 입고
         if len(self.plates[action]) == self.max_stack:  # 적치 강재가 최대 높이를 초과하면 실패로 간주
             done = True
             reward = -1.0
@@ -41,6 +34,9 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
             self.stage += 1
         if len(self.inbound_plates) == 0:
             done = True
+        elif self.inbound_plates[0].inbound != self.current_date:
+            self.current_date = self.inbound_plates[0].inbound
+            self._export_plates()
         next_state = self._get_state()  # 쌓인 강재들 리스트에서 state 를 계산
         return next_state, reward, done
 
@@ -75,6 +71,17 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
             for j, plate in enumerate(pile):
                 state[j, i] = plate.outbound - plate.inbound
         return state.flatten()
+
+    def _export_plates(self):
+        for pile in self.plates:
+            oubounds = []
+            for i, plate in enumerate(pile):
+                if plate.outbound == self.current_date:
+                    oubounds.append(i)
+            for index in oubounds[::-1]:
+                del pile[index]
+
+
 
 
 # 환경을 가시화하는 용도, 사람이 action 을 입력해야하므로 학습시에는 실행하지 않음
@@ -197,7 +204,7 @@ class LocatingDisplay(object):
                 action = -1
             self.gameDisplay.fill(self.black)
             self.draw_space(self.space)
-            self.board(self.space.step, reward)
+            self.board(self.space.stage, reward)
             self.draw_grid(self.width, 1, self.x_init, self.y_init, self.x_span, self.y_span * self.height)
             self.draw_grid(1, 1, 100, 100, self.x_span, self.y_span * 10)
             self.message_display('Inbound plates', 150, 80)
@@ -220,9 +227,9 @@ class LocatingDisplay(object):
     def draw_space(self, space):
         for i, pile in enumerate(space.plates):
             for j, plate in enumerate(pile):
-                rgb = 150 * (1 / max(1, plate.outbound - plate.inbound))
+                rgb = 150 * (1 / max(1, plate.outbound - space.current_date))
                 self.block(i, self.space.max_stack - j - 1, plate.id, (rgb, rgb, rgb), x_init=self.x_init)
-        for i, plate in enumerate(space.inbound_plates[-10:]):
+        for i, plate in enumerate(space.inbound_plates[:10]):
             rgb = 150 * (1 / max(1, plate.outbound - plate.inbound))
             self.block(0, self.space.max_stack - i - 1, plate.id, (rgb, rgb, rgb), x_init=100)
 
@@ -235,6 +242,8 @@ class LocatingDisplay(object):
 
 # 환경 가시화 및 테스트시에 사용하는 코드
 if __name__ == '__main__':
-    inbounds = [Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
+    #inbounds = [plate.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
+
+    inbounds = plate.import_plates_schedule('data/plate_example1.csv')
     s = Locating(max_stack=10, num_pile=8, inbound_plates=inbounds, display_env=True)  # 환경 테스트
     print(s.plates)

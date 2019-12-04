@@ -15,6 +15,7 @@ import pandas as pd
 import tensorflow as tf
 
 import environment.steelstockyard as ssy
+import environment.plate as plate
 
 np.random.seed(1)
 tf.set_random_seed(1)
@@ -33,7 +34,7 @@ class DeepQNetwork:
             memory_size=500,
             batch_size=32,
             e_greedy_increment=None,
-            output_graph=False,
+            output_graph=True,
     ):
         self.n_actions = n_actions
         self.n_features = n_features
@@ -63,7 +64,7 @@ class DeepQNetwork:
         if output_graph:
             # $ tensorboard --logdir=logs
             # tf.train.SummaryWriter soon be deprecated, use following
-            tf.summary.FileWriter("logs/", self.sess.graph)
+            tf.summary.FileWriter("logs/dqn/", self.sess.graph)
 
         self.sess.run(tf.global_variables_initializer())
         self.cost_his = []
@@ -141,7 +142,7 @@ class DeepQNetwork:
         # check to replace target parameters
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.sess.run(self.replace_target_op)
-            print('\ntarget_params_replaced\n')
+            #print('\ntarget_params_replaced\n')
 
         # sample batch memory from all memory
         if self.memory_counter > self.memory_size:
@@ -186,14 +187,15 @@ class DeepQNetwork:
 def plot_reward(rewards):
     import matplotlib.pyplot as plt
     plt.plot(np.arange(len(rewards)), rewards)
-    plt.ylabel('Reward')
+    plt.ylabel('average reward')
     plt.xlabel('training episode')
     plt.show()
 
 
-def run(episodes=3000, update_term=5):
+def run(episodes=1000, update_term=5):
     step = 0
     rewards = []
+    avg_rewards = []
     for episode in range(episodes):
         # initial observation
         observation = env.reset()
@@ -219,23 +221,28 @@ def run(episodes=3000, update_term=5):
             # break while loop when end of this episode
             if done:
                 rewards.append(sum(rs))
+                avg_rewards.append(sum(rewards) / len(rewards))
                 break
             step += 1
-    plot_reward(rs)
+        if episode % 100 == 0:
+            print('episode: {0} finished'.format(episode))
+
+    plot_reward(avg_rewards)
     # end of game
     print('game over')
 
 
 if __name__ == "__main__":
     # ssy environment
-    inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
+    #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
+    inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
     env = ssy.Locating(max_stack=10, num_pile=8, inbound_plates=inbounds, display_env=False)
     RL = DeepQNetwork(env.action_space, env.n_features,
                       learning_rate=0.01,
-                      reward_decay=0.9,
+                      reward_decay=1,
                       e_greedy=0.9,
                       replace_target_iter=200,
                       memory_size=20000,
-                      # output_graph=True
+                      output_graph=False
                       )
-    run()
+    run(1000)
