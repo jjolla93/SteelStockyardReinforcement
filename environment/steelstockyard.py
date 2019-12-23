@@ -244,6 +244,7 @@ class LocatingDisplay(object):
 if __name__ == '__main__':
     #inbounds = [plate.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
 
-    inbounds = plate.import_plates_schedule('data/plate_example1.csv')
+    #inbounds = plate.import_plates_schedule('data/plate_example1.csv')
+    inbounds = plate.import_plates_schedule_rev('data/SampleData.csv')
     s = Locating(max_stack=10, num_pile=8, inbound_plates=inbounds, display_env=True)  # 환경 테스트
     print(s.plates)

@@ -94,7 +94,7 @@ class DeepQNetwork:
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval))
         with tf.variable_scope('train'):
-            self._train_op = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+            self._train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
         # ------------------ build target_net ------------------
         self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')    # input
@@ -235,14 +235,15 @@ def run(episodes=1000, update_term=5):
 if __name__ == "__main__":
     # ssy environment
     #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
-    inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
-    env = ssy.Locating(max_stack=10, num_pile=8, inbound_plates=inbounds, display_env=False)
+    #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
+    inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
+    env = ssy.Locating(max_stack=70, num_pile=20, inbound_plates=inbounds, display_env=True)
     RL = DeepQNetwork(env.action_space, env.n_features,
-                      learning_rate=0.01,
+                      learning_rate=0.0001,
                       reward_decay=1,
                       e_greedy=0.9,
                       replace_target_iter=200,
                       memory_size=20000,
                       output_graph=False
                       )
-    run(1000)
+    run(5000)
