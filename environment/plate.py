@@ -10,19 +10,25 @@ def import_plates_schedule(filepath):
         plates.append(plate)
     return plates
 
+
 def import_plates_schedule_rev(filepath):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
     plates = []
-    num = df_schedule['자재번호']
+    plate_id = df_schedule['자재번호']
     inbound_dates = pd.to_datetime(df_schedule['최근입고일'], format='%Y.%m.%d')
     outbound_dates = pd.to_datetime(df_schedule['블록S/C일자'], format='%Y.%m.%d')
     initial_date = inbound_dates.min()
     inbound_dates = inbound_dates - initial_date
     outbound_dates = outbound_dates - initial_date
+    table = pd.DataFrame({"plate_id": plate_id, "inbound_date": inbound_dates, "outbound_date": outbound_dates})
+    table.dropna(inplace=True)
+    table.sort_values(by=['inbound_date'], inplace=True)
+    print(table['inbound_date'][0].days)
 
-    for i in range(len(num)):
-        if inbound_dates[i] < outbound_dates[i]:
-            plate = Plate(num[i], inbound_dates[i].days, outbound_dates[i].days)
+    for i, row in table.iterrows():
+        if row['inbound_date'].days < row['outbound_date'].days:
+            plate = Plate(row['plate_id'], row['inbound_date'].days, row['outbound_date'].days)
+            print("{0}: {1} {2}".format(plate.id, plate.inbound, plate.outbound))
             plates.append(plate)
     return plates
 
