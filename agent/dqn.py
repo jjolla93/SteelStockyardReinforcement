@@ -72,18 +72,32 @@ class DeepQNetwork:
     def _build_net(self):
         # ------------------ build evaluate_net ------------------
         self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
+        self.s_reshaped = tf.reshape(self.s, shape=[-1, int(self.n_features / self.n_actions), self.n_actions, 1])
         self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
         with tf.variable_scope('eval_net'):
             # c_names(collections_names) are the collections to store variables
             c_names, n_l1, w_initializer, b_initializer = \
                 ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 10, \
-                tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)  # config of layers
+                tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1) # config of layers
+
+            # first convolution layer.
+            with tf.variable_scope('conv1'):
+                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 1], initializer=w_initializer, collections=c_names)
+                b1_conv = tf.get_variable('b1_conv', [1], initializer=b_initializer, collections=c_names)
+                conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
+
+            # second convolution layer.
+            with tf.variable_scope('conv1'):
+                w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
+                b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
+                conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
+                conv2 = tf.layers.flatten(conv2)
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [23*8, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
-                l1 = tf.nn.relu(tf.matmul(self.s, w1) + b1)
+                l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
@@ -97,16 +111,30 @@ class DeepQNetwork:
             self._train_op = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
 
         # ------------------ build target_net ------------------
-        self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')    # input
+        self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
+        self.s_reshaped_ = tf.reshape(self.s_, shape=[-1, int(self.n_features / self.n_actions), self.n_actions, 1])
         with tf.variable_scope('target_net'):
             # c_names(collections_names) are the collections to store variables
             c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
 
+            # first convolution layer.
+            with tf.variable_scope('conv1'):
+                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 1], initializer=w_initializer, collections=c_names)
+                b1_conv = tf.get_variable('b1_conv', [1], initializer=b_initializer, collections=c_names)
+                conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped_, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
+
+            # second convolution layer.
+            with tf.variable_scope('conv1'):
+                w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
+                b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
+                conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
+                conv2 = tf.layers.flatten(conv2)
+
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [23*8, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
-                l1 = tf.nn.relu(tf.matmul(self.s_, w1) + b1)
+                l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
@@ -237,7 +265,7 @@ if __name__ == "__main__":
     #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
     #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
     inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
-    env = ssy.Locating(max_stack=16, num_pile=12, inbound_plates=inbounds, display_env=False)
+    env = ssy.Locating(max_stack=50, num_pile=20, inbound_plates=inbounds, display_env=False)
     RL = DeepQNetwork(env.action_space, env.n_features,
                       learning_rate=0.001,
                       reward_decay=1,

@@ -23,7 +23,6 @@ def import_plates_schedule_rev(filepath):
     table = pd.DataFrame({"plate_id": plate_id, "inbound_date": inbound_dates, "outbound_date": outbound_dates})
     table.dropna(inplace=True)
     table.sort_values(by=['inbound_date'], inplace=True)
-    print(table['inbound_date'][0].days)
 
     for i, row in table.iterrows():
         if row['inbound_date'].days < row['outbound_date'].days:
