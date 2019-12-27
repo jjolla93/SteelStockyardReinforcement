@@ -27,7 +27,6 @@ def import_plates_schedule_rev(filepath):
     for i, row in table.iterrows():
         if row['inbound_date'].days < row['outbound_date'].days:
             plate = Plate(row['plate_id'], row['inbound_date'].days, row['outbound_date'].days)
-            print("{0}: {1} {2}".format(plate.id, plate.inbound, plate.outbound))
             plates.append(plate)
     return plates
 
