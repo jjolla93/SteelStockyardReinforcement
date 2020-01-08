@@ -35,6 +35,7 @@ class DeepQNetwork:
             batch_size=32,
             e_greedy_increment=None,
             output_graph=True,
+            load_model = False
     ):
         self.n_actions = n_actions
         self.n_features = n_features
@@ -60,13 +61,19 @@ class DeepQNetwork:
         self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)]
 
         self.sess = tf.Session()
+        saver = tf.train.Saver()
+
+        if load_model:
+            ckpt = tf.train.get_checkpoint_state(load_model)
+            saver.restore(self.sess, ckpt.model_checkpoint_path)
+        else:
+            self.sess.run(tf.global_variables_initializer())
 
         if output_graph:
             # $ tensorboard --logdir=logs
             # tf.train.SummaryWriter soon be deprecated, use following
             tf.summary.FileWriter("logs/dqn/", self.sess.graph)
 
-        self.sess.run(tf.global_variables_initializer())
         self.cost_his = []
 
     def _build_net(self):
@@ -86,15 +93,18 @@ class DeepQNetwork:
                 b1_conv = tf.get_variable('b1_conv', [1], initializer=b_initializer, collections=c_names)
                 conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
 
+
             # second convolution layer.
-            with tf.variable_scope('conv1'):
+            with tf.variable_scope('conv2'):
                 w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
                 conv2 = tf.layers.flatten(conv2)
 
+
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
+
                 w1 = tf.get_variable('w1', [23*8, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
@@ -124,7 +134,7 @@ class DeepQNetwork:
                 conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped_, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
 
             # second convolution layer.
-            with tf.variable_scope('conv1'):
+            with tf.variable_scope('conv2'):
                 w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
@@ -204,6 +214,10 @@ class DeepQNetwork:
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1
 
+    def save_model(self, filepath):
+        saver = tf.train.Saver()
+        saver.save(self.sess, filepath)
+
     def plot_cost(self):
         import matplotlib.pyplot as plt
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)
@@ -224,9 +238,9 @@ def run(episodes=1000, update_term=5):
     step = 0
     rewards = []
     avg_rewards = []
-    for episode in range(episodes):
+    for episode in range(1, episodes+1):
         # initial observation
-        observation = env.reset()
+        observation = env.reset(hold=False)
         rs = []
         while True:
             # fresh env
@@ -254,7 +268,8 @@ def run(episodes=1000, update_term=5):
             step += 1
         if episode % 100 == 0:
             print('episode: {0} finished'.format(episode))
-
+    #filepath = '../environment/data/dqn_max_stack_{0}_and_num_pile_{1}.ckpt'.format(env.max_stack, int(env.n_features/env.max_stack))
+    #RL.save_model(filepath)
     plot_reward(avg_rewards)
     # end of game
     print('game over')
@@ -264,8 +279,8 @@ if __name__ == "__main__":
     # ssy environment
     #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
     #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
-    inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
-    env = ssy.Locating(max_stack=50, num_pile=20, inbound_plates=inbounds, display_env=False)
+    #inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv', graph=True)
+    env = ssy.Locating(max_stack=50, num_pile=20, display_env=False)
     RL = DeepQNetwork(env.action_space, env.n_features,
                       learning_rate=0.001,
                       reward_decay=1,
@@ -274,4 +289,4 @@ if __name__ == "__main__":
                       memory_size=20000,
                       output_graph=False
                       )
-    run(10000)
+    run(1000)

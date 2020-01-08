@@ -1,5 +1,7 @@
 import pandas as pd
+import scipy.stats as stats
 from random import randint
+from datetime import datetime
 
 
 def import_plates_schedule(filepath):
@@ -11,24 +13,59 @@ def import_plates_schedule(filepath):
     return plates
 
 
-def import_plates_schedule_rev(filepath):
+def import_plates_schedule_rev(filepath, graph=False):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
-    plates = []
-    plate_id = df_schedule['자재번호']
-    inbound_dates = pd.to_datetime(df_schedule['최근입고일'], format='%Y.%m.%d')
-    outbound_dates = pd.to_datetime(df_schedule['블록S/C일자'], format='%Y.%m.%d')
-    initial_date = inbound_dates.min()
-    inbound_dates = inbound_dates - initial_date
-    outbound_dates = outbound_dates - initial_date
-    table = pd.DataFrame({"plate_id": plate_id, "inbound_date": inbound_dates, "outbound_date": outbound_dates})
-    table.dropna(inplace=True)
-    table.sort_values(by=['inbound_date'], inplace=True)
+    df_schedule.dropna(subset=['자재번호', '최근입고일', '블록S/C일자'], inplace=True)
+    df_schedule['최근입고일'] = pd.to_datetime(df_schedule['최근입고일'], format='%Y.%m.%d')
+    df_schedule['블록S/C일자'] = pd.to_datetime(df_schedule['블록S/C일자'], format='%Y.%m.%d')
+    df_schedule = df_schedule[df_schedule['최근입고일'] >= datetime(2019, 1, 1)]
+    df_schedule = df_schedule[df_schedule['최근입고일'] <= df_schedule['블록S/C일자']]
+    initial_date = df_schedule['최근입고일'].min()
+    df_schedule['최근입고일'] = (df_schedule['최근입고일'] - initial_date).dt.days
+    df_schedule['블록S/C일자'] = (df_schedule['블록S/C일자'] - initial_date).dt.days
+    df_schedule.sort_values(by=['최근입고일'], inplace=True)
+    df_schedule.reset_index(drop=True, inplace=True)
 
-    for i, row in table.iterrows():
-        if row['inbound_date'].days < row['outbound_date'].days:
-            plate = Plate(row['plate_id'], row['inbound_date'].days, row['outbound_date'].days)
-            plates.append(plate)
+    if graph:
+        inter_arrival_time = (df_schedule['최근입고일'].diff()).dropna()
+        stock_time = (df_schedule['블록S/C일자'] - df_schedule['최근입고일'])[df_schedule['블록S/C일자'] >= df_schedule['최근입고일']]
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        ax1 = fig.add_subplot(2, 1, 1)
+        ax2 = fig.add_subplot(2, 1, 2)
+        ax1.set_title('Inter Arrival Time'); ax1.set_xlabel('time'); ax1.set_ylabel('normalized frequency of occurrence')
+        ax2.set_title('Stock Time'); ax2.set_xlabel('time'); ax2.set_ylabel('normalized frequency of occurrence')
+        ax1.hist(list(inter_arrival_time), bins=100, density=True)
+        ax2.hist(list(stock_time), bins=100, density=True)
+        plt.show()
+
+    plates = []
+    for i, row in df_schedule.iterrows():
+        plate = Plate(row['자재번호'], row['최근입고일'], row['블록S/C일자'])
+        plates.append(plate)
     return plates
+
+
+def generate_schedule(arrival_scale = 1/0.27, stock_mean = 44, stock_std = 32.5, num_plate=250):
+    df_schedule = pd.DataFrame(columns=['자재번호', '최근입고일', '블록S/C일자'])
+    arrivals = stats.expon.rvs(scale=arrival_scale, size=num_plate)
+    arrivals[0] = 0
+    #stocks = stats.expon.rvs(scale=stock_scale, size=num_plate)
+    stocks = stats.norm.rvs(loc=stock_mean, scale=stock_std, size=num_plate)
+    current_date = 0
+    plates = []
+    for i in range(num_plate):
+        plate_id = 'plate' + str(i)
+        inbound_date = current_date + arrivals[i]
+        outbound_date = inbound_date + stocks[i]
+        if inbound_date > outbound_date:
+            outbound_date = inbound_date
+        current_date = inbound_date
+        plate = Plate(plate_id, inbound_date, outbound_date)
+        plates.append(plate)
+        #row = pd.Series([plate_id, inbound_date, outbound_date], index=['자재번호', '최근입고일', '블록S/C일자'])
+        #df_schedule = df_schedule.append(row, ignore_index=True)
+    return plates #df_schedule
 
 
 # 강재 정보 클래스 id, 입출고일정 포함

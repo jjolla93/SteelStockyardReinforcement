@@ -1,4 +1,5 @@
 from random import randint
+from environment import plate
 import numpy as np
 import pygame
 import time
@@ -13,11 +14,16 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         self.empty = 0  # 빈 공간의 상태 표현 값
         self.stage = 0
         self.current_date = 0
-        self.inbound_plates = inbound_plates
-        self.inbound_clone = inbound_plates[:]
         self.plates = [[] for _ in range(num_pile)]  # 각 파일을 빈 리스트로 초기화
         self.n_features = max_stack * num_pile
         # self.yard = np.full([max_stack, num_pile], self.empty)
+        if inbound_plates:
+            self.inbound_plates = inbound_plates
+            self.inbound_clone = self.inbound_plates[:]
+        else:
+            #print("generate new schedule")
+            self.inbound_plates = plate.generate_schedule()
+            self.inbound_clone = self.inbound_plates[:]
         if display_env:  # 환경을 게임엔진으로 가시화하는 용도. 학습용시에는 사용하지 않음
             display = LocatingDisplay(self, num_pile, max_stack, 2)
             display.game_loop_from_space()
@@ -40,8 +46,13 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         next_state = self._get_state()  # 쌓인 강재들 리스트에서 state 를 계산
         return next_state, reward, done
 
-    def reset(self):
-        self.inbound_plates = self.inbound_clone[:]
+    def reset(self, hold=True):
+        if not hold:
+            #print("generate new schedule")
+            self.inbound_plates = plate.generate_schedule()
+            self.inbound_clone = self.inbound_plates[:]
+        else:
+            self.inbound_plates = self.inbound_clone[:]
         self.plates = [[] for _ in range(self.action_space)]
         self.stage = 0
         return self._get_state()
