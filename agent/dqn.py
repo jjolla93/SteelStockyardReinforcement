@@ -89,23 +89,21 @@ class DeepQNetwork:
 
             # first convolution layer.
             with tf.variable_scope('conv1'):
-                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 1], initializer=w_initializer, collections=c_names)
+                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 16], initializer=w_initializer, collections=c_names)
                 b1_conv = tf.get_variable('b1_conv', [1], initializer=b_initializer, collections=c_names)
                 conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
 
-
             # second convolution layer.
             with tf.variable_scope('conv2'):
-                w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
+                w2_conv = tf.get_variable('w2_conv', [2, 2, 16, 32], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
                 conv2 = tf.layers.flatten(conv2)
 
-
             # first layer. collections is used later when assign to target net
-            with tf.variable_scope('l1'):
+            with tf.variable_scope('l1'): #23*8
 
-                w1 = tf.get_variable('w1', [23*8, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [64, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
 
@@ -129,20 +127,20 @@ class DeepQNetwork:
 
             # first convolution layer.
             with tf.variable_scope('conv1'):
-                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 1], initializer=w_initializer, collections=c_names)
+                w1_conv = tf.get_variable('w1_conv', [4, 4, 1, 16], initializer=w_initializer, collections=c_names)
                 b1_conv = tf.get_variable('b1_conv', [1], initializer=b_initializer, collections=c_names)
                 conv1 = tf.nn.relu(tf.nn.conv2d(self.s_reshaped_, w1_conv, strides=[1, 2, 2, 1], padding='VALID') + b1_conv)
 
             # second convolution layer.
             with tf.variable_scope('conv2'):
-                w2_conv = tf.get_variable('w2_conv', [2, 2, 1, 1], initializer=w_initializer, collections=c_names)
+                w2_conv = tf.get_variable('w2_conv', [2, 2, 16, 32], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
                 conv2 = tf.layers.flatten(conv2)
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [23*8, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [64, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
 
@@ -240,7 +238,7 @@ def run(episodes=1000, update_term=5):
     avg_rewards = []
     for episode in range(1, episodes+1):
         # initial observation
-        observation = env.reset(hold=False)
+        observation = env.reset(episode, hold=True)
         rs = []
         while True:
             # fresh env
@@ -280,7 +278,8 @@ if __name__ == "__main__":
     #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
     #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
     #inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv', graph=True)
-    env = ssy.Locating(max_stack=50, num_pile=20, display_env=False)
+    inbounds = plate.import_plates_schedule_by_week('../environment/data/SampleData.csv')
+    env = ssy.Locating(max_stack=6, num_pile=8, inbound_plates=inbounds, display_env=False)
     RL = DeepQNetwork(env.action_space, env.n_features,
                       learning_rate=0.001,
                       reward_decay=1,
@@ -289,4 +288,4 @@ if __name__ == "__main__":
                       memory_size=20000,
                       output_graph=False
                       )
-    run(1000)
+    run(10000)
