@@ -86,6 +86,8 @@ def import_plates_schedule_by_week(filepath):
     while len(df_schedule) != 0:
         plates_by_week = []
         temp = df_schedule[df_schedule['블록S/C일자'] <= day]
+        temp.sort_values(by=['최근입고일'], inplace=True)
+        temp.reset_index(drop=True, inplace=True)
         steel_num = len(temp)
 
         if steel_num > 0:
@@ -143,12 +145,13 @@ class Plate(object):
 
 
 if __name__ == "__main__":
-    inbounds = import_plates_schedule_by_day('../environment/data/SampleData.csv')
+    inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
     f = open("../environment/data/plate.txt", 'w')
     for i in range(len(inbounds)):
         f.write(("-" * 50) + "\n")
         f.write("총 {0}개\n".format(len(inbounds[i])))
         f.write("\n")
         for j in range(len(inbounds[i])):
-            f.write("자재번호: {0}, 블록S/C일자: {1}\n".format(inbounds[i][j].id, inbounds[i][j].outbound))
+            f.write("자재번호: {0}, 최근입고일: {1}, 블록S/C일자: {2}\n".
+                    format(inbounds[i][j].id, inbounds[i][j].inbound, inbounds[i][j].outbound))
     f.close()

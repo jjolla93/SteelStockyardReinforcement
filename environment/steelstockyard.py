@@ -33,7 +33,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         inbound = self.inbound_plates.pop(0)  # 입고 강재 리스트 가장 위에서부터 강재를 하나씩 입고
         if len(self.plates[action]) == self.max_stack:  # 적치 강재가 최대 높이를 초과하면 실패로 간주
             done = True
-            reward = -1.0
+            reward = -100.0
         else:
             self.plates[action].append(inbound)  # action 에 따라서 강재를 적치
             reward = self._calculate_reward(action)  # 해당 action 에 대한 보상을 계산
@@ -52,7 +52,8 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
             self.inbound_plates = plate.generate_schedule()
             self.inbound_clone = self.inbound_plates[:]
         else:
-            self.inbound_plates = self.inbound_clone[(episode-1) % len(self.inbound_clone)][:]
+            #self.inbound_plates = self.inbound_clone[(episode-1) % len(self.inbound_clone)][:]
+            self.inbound_plates = self.inbound_clone[3][:]
         self.plates = [[] for _ in range(self.action_space)]
         self.stage = 0
         return self._get_state()
@@ -91,8 +92,6 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
                     oubounds.append(i)
             for index in oubounds[::-1]:
                 del pile[index]
-
-
 
 
 # 환경을 가시화하는 용도, 사람이 action 을 입력해야하므로 학습시에는 실행하지 않음
