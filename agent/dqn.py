@@ -13,7 +13,9 @@ gym: 0.7.3
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import os
 
+from agent.helper import *
 import environment.steelstockyard as ssy
 import environment.plate as plate
 
@@ -27,6 +29,7 @@ class DeepQNetwork:
             self,
             n_actions,
             n_features,
+            feature_size,
             learning_rate=0.01,
             reward_decay=0.9,
             e_greedy=0.9,
@@ -39,6 +42,7 @@ class DeepQNetwork:
     ):
         self.n_actions = n_actions
         self.n_features = n_features
+        self.feature_size = feature_size
         self.lr = learning_rate
         self.gamma = reward_decay
         self.epsilon_max = e_greedy
@@ -81,10 +85,11 @@ class DeepQNetwork:
         self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
         self.s_reshaped = tf.reshape(self.s, shape=[-1, int(self.n_features / self.n_actions), self.n_actions, 1])
         self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
+
         with tf.variable_scope('eval_net'):
             # c_names(collections_names) are the collections to store variables
-            c_names, n_l1, w_initializer, b_initializer = \
-                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 10, \
+            c_names, n_l1, n_l2, w_initializer, b_initializer = \
+                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 20, 20, \
                 tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1) # config of layers
 
             # first convolution layer.
@@ -98,20 +103,25 @@ class DeepQNetwork:
                 w2_conv = tf.get_variable('w2_conv', [2, 2, 16, 32], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
-                conv2 = tf.layers.flatten(conv2)
+                conv2_flat = tf.layers.flatten(conv2)
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'): #23*8
-
-                w1 = tf.get_variable('w1', [64, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [128, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
-                l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
+                l1 = tf.nn.relu(tf.matmul(conv2_flat, w1) + b1)
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_eval = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [n_l1, n_l2], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, n_l2], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            # third layer. collections is used later when assign to target net
+            with tf.variable_scope('l3'):
+                w3 = tf.get_variable('w3', [n_l2, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_eval = tf.matmul(l2, w3) + b3
 
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval))
@@ -136,19 +146,25 @@ class DeepQNetwork:
                 w2_conv = tf.get_variable('w2_conv', [2, 2, 16, 32], initializer=w_initializer, collections=c_names)
                 b2_conv = tf.get_variable('b2_conv', [1], initializer=b_initializer, collections=c_names)
                 conv2 = tf.nn.relu(tf.nn.conv2d(conv1, w2_conv, strides=[1, 1, 1, 1], padding='VALID') + b2_conv)
-                conv2 = tf.layers.flatten(conv2)
+                conv2_flat = tf.layers.flatten(conv2)
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [64, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [128, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
-                l1 = tf.nn.relu(tf.matmul(conv2, w1) + b1)
+                l1 = tf.nn.relu(tf.matmul(conv2_flat, w1) + b1)
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_next = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [n_l1, n_l2], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, n_l2], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            # third layer. collections is used later when assign to target net
+            with tf.variable_scope('l3'):
+                w3 = tf.get_variable('w3', [n_l2, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_next = tf.matmul(l2, w3) + b3
 
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):
@@ -212,9 +228,13 @@ class DeepQNetwork:
         self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
         self.learn_step_counter += 1
 
-    def save_model(self, filepath):
+    def save_model(self):
+        if not os.path.exists('../models/dqn'):
+            os.makedirs('../models/dqn')
+        if not os.path.exists('../models/dqn/%d-%d' % (self.feature_size[1], self.feature_size[0])):
+            os.makedirs('../models/dqn/%d-%d' % (self.feature_size[1], self.feature_size[0]))
         saver = tf.train.Saver()
-        saver.save(self.sess, filepath)
+        saver.save(self.sess, '../models/dqn/%d-%d' % (self.feature_size[1], self.feature_size[0]))
 
     def plot_cost(self):
         import matplotlib.pyplot as plt
@@ -225,6 +245,14 @@ class DeepQNetwork:
 
 
 def plot_reward(rewards):
+    if not os.path.exists('../rewards/dqn'):
+        os.makedirs('../rewards/dqn')
+    import csv
+    f = open('rewards_{0}_{1}.csv'.format(env.action_space, env.max_stack), 'w', encoding='utf-8')
+    wr = csv.writer(f)
+    for i in range(1, len(rewards)+1):
+        wr.writerow([i, rewards[i-1]])
+    f.close()
     import matplotlib.pyplot as plt
     plt.plot(np.arange(len(rewards)), rewards)
     plt.ylabel('average reward')
@@ -240,9 +268,12 @@ def run(episodes=1000, update_term=5):
         # initial observation
         observation = env.reset(episode, hold=True)
         rs = []
+        episode_frames = []
         while True:
             # fresh env
             #env.render()
+
+            episode_frames.append(observation[::-1])
 
             # RL choose action based on observation
             action = RL.choose_action(observation)
@@ -266,8 +297,12 @@ def run(episodes=1000, update_term=5):
             step += 1
         if episode % 100 == 0:
             print('episode: {0} finished'.format(episode))
-    #filepath = '../environment/data/dqn_max_stack_{0}_and_num_pile_{1}.ckpt'.format(env.max_stack, int(env.n_features/env.max_stack))
-    #RL.save_model(filepath)
+            if not os.path.exists('../frames/dqn'):
+                os.makedirs('../frames/dqn')
+            if not os.path.exists('../frames/dqn/%d-%d' % (env.action_space, env.max_stack)):
+                os.makedirs('../frames/dqn/%d-%d' % (env.action_space, env.max_stack))
+            save_gif(episode_frames, RL.feature_size, episode, 'dqn')
+    RL.save_model()
     plot_reward(avg_rewards)
     # end of game
     print('game over')
@@ -277,15 +312,18 @@ if __name__ == "__main__":
     # ssy environment
     #inbounds = [ssy.Plate('P' + str(i), outbound=-1) for i in range(30)]  # 테스트용 임의 강재 데이터
     #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
-    #inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv', graph=True)
+    #inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
     inbounds = plate.import_plates_schedule_by_week('../environment/data/SampleData.csv')
-    env = ssy.Locating(max_stack=6, num_pile=8, inbound_plates=inbounds, display_env=False)
-    RL = DeepQNetwork(env.action_space, env.n_features,
+
+    env = ssy.Locating(max_stack=8, num_pile=8, inbound_plates=inbounds, display_env=False)
+
+    RL = DeepQNetwork(env.action_space, env.n_features, (env.max_stack, env.action_space),
                       learning_rate=0.001,
                       reward_decay=1,
                       e_greedy=0.9,
                       replace_target_iter=200,
                       memory_size=20000,
+                      #e_greedy_increment=0.01,
                       output_graph=False
                       )
-    run(10000)
+    run(30000)
