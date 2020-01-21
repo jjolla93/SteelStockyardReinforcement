@@ -25,7 +25,7 @@ class Actor(object):
         self.feature_size = feature_size
 
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
-        self.s_reshaped = tf.reshape(self.s, shape=[-1, int(n_features / n_actions), n_actions, 1])
+        self.s_reshaped = tf.reshape(self.s, shape=[-1, self.feature_size[0], self.feature_size[1], 1])
         self.a = tf.placeholder(tf.int32, None, "act")
         self.td_error = tf.placeholder(tf.float32, None, "td_error")  # TD_error
 
@@ -99,10 +99,10 @@ class Actor(object):
             os.makedirs('../models/a2c')
         if not os.path.exists('../models/a2c/actor'):
             os.makedirs('../models/a2c/actor')
-        if not os.path.exists('../models/a2c/actor/%d-%d' % (self.feature_size[1], self.feature_size[0])):
-            os.makedirs('../models/a2c/actor/%d-%d' % (self.feature_size[1], self.feature_size[0]))
+        if not os.path.exists('../models/a2c/actor/%d-%d' % (self.feature_size[0], self.feature_size[1])):
+            os.makedirs('../models/a2c/actor/%d-%d' % (self.feature_size[0], self.feature_size[1]))
         saver = tf.train.Saver()
-        saver.save(self.sess, '../models/a2c/actor/%d-%d' % (self.feature_size[1], self.feature_size[0]))
+        saver.save(self.sess, '../models/a2c/actor/%d-%d' % (self.feature_size[0], self.feature_size[1]))
 
 
 class Critic(object):
@@ -111,7 +111,7 @@ class Critic(object):
         self.feature_size = feature_size
 
         self.s = tf.placeholder(tf.float32, [1, n_features], "state")
-        self.s_reshaped = tf.reshape(self.s, shape=[-1, int(n_features / n_actions), n_actions, 1])
+        self.s_reshaped = tf.reshape(self.s, shape=[-1, feature_size[0], feature_size[1], 1])
         self.v_ = tf.placeholder(tf.float32, [1, 1], "v_next")
         self.r = tf.placeholder(tf.float32, None, 'r')
 
@@ -184,17 +184,18 @@ class Critic(object):
             os.makedirs('../models/a2c')
         if not os.path.exists('../models/a2c/critic'):
             os.makedirs('../models/a2c/critic')
-        if not os.path.exists('../models/a2c/critic/%d-%d' % (self.feature_size[1], self.feature_size[0])):
-            os.makedirs('../models/a2c/critic/%d-%d' % (self.feature_size[1], self.feature_size[0]))
+        if not os.path.exists('../models/a2c/critic/%d-%d' % (self.feature_size[0], self.feature_size[1])):
+            os.makedirs('../models/a2c/critic/%d-%d' % (self.feature_size[0], self.feature_size[1]))
         saver = tf.train.Saver()
-        saver.save(self.sess, '../models/a2c/critic/%d-%d' % (self.feature_size[1], self.feature_size[0]))
+        saver.save(self.sess, '../models/a2c/critic/%d-%d' % (self.feature_size[0], self.feature_size[1]))
 
 
 def plot_reward(rewards):
-    if not os.path.exists('../rewards/a2c'):
-        os.makedirs('../rewards/a2c')
+    if not os.path.exists('../summary/a2c'):
+        os.makedirs('../summary/a2c')
     import csv
-    f = open('rewards_{0}_{1}.csv'.format(env.action_space, env.max_stack), 'w', encoding='utf-8')
+    f = open('../summary/a2c/{0}_{1}/rewards_{2}_{3}.csv'.
+             format(s_shape[0], s_shape[1], env.action_space, env.max_stack), 'w', encoding='utf-8')
     wr = csv.writer(f)
     for i in range(1, len(rewards)+1):
         wr.writerow([i, rewards[i-1]])
@@ -217,7 +218,7 @@ def run(episodes=1000):
         while True:
             #if RENDER: env.render()
 
-            episode_frames.append(s[::-1])
+            episode_frames.append(s)
 
             a = actor.choose_action(s)
             s_, r, done = env.step(a)
@@ -238,9 +239,9 @@ def run(episodes=1000):
             print('episode: {0} finished'.format(episode))
             if not os.path.exists('../frames/a2c'):
                 os.makedirs('../frames/a2c')
-            if not os.path.exists('../frames/a2c/%d-%d' % (env.action_space, env.max_stack)):
-                os.makedirs('../frames/a2c/%d-%d' % (env.action_space, env.max_stack))
-            save_gif(episode_frames, (env.max_stack, env.action_space), episode, 'a2c')
+            if not os.path.exists('../frames/a2c/%d-%d' % s_shape):
+                os.makedirs('../frames/a2c/%d-%d' % s_shape)
+            save_gif(episode_frames, s_shape, episode, 'a2c')
     actor.save_model()
     critic.save_model()
     plot_reward(avg_rewards)
@@ -254,22 +255,31 @@ if __name__ == "__main__":
     # inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
     inbounds = plate.import_plates_schedule_by_week('../environment/data/SampleData.csv')
 
-    env = ssy.Locating(max_stack=8, num_pile=8, inbound_plates=inbounds, display_env=False)
+    max_stack = 11
+    num_pile = 6
+    observe_inbounds = True
+    if observe_inbounds:
+        s_shape = (max_stack, num_pile + 1)
+    else:
+        s_shape = (max_stack, num_pile)
+    s_size = s_shape[0] * s_shape[1]
+    env = ssy.Locating(max_stack=max_stack, num_pile=num_pile, inbound_plates=inbounds,
+                        observe_inbounds=observe_inbounds, display_env=False)
 
-    N_F = env.n_features
+    N_F = s_size
     N_A = env.action_space
 
     # Superparameters
     #OUTPUT_GRAPH = False
     #RENDER = True  # rendering wastes time
-    GAMMA = 0.9  # reward discount in TD error
-    LR_A = 0.00001  # learning rate for actor
-    LR_C = 0.001  # learning rate for critic
+    GAMMA = 0.99  # reward discount in TD error
+    LR_A = 1e-5  # learning rate for actor
+    LR_C = 1e-5  # learning rate for critic
 
     sess = tf.Session()
 
-    actor = Actor(sess, N_F, N_A, (env.max_stack, env.action_space), lr=LR_A)
-    critic = Critic(sess, N_F, N_A, (env.max_stack, env.action_space), lr=LR_C)
+    actor = Actor(sess, N_F, N_A, s_shape, lr=LR_A)
+    critic = Critic(sess, N_F, N_A, s_shape, lr=LR_C)
 
     sess.run(tf.global_variables_initializer())
 

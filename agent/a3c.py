@@ -270,21 +270,21 @@ class Worker():
 
 inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
 max_episode_length = 300
-max_episode = 20000
+max_episode = 50000
 gamma = .99  # discount rate for advantage estimation and reward discounting
-max_stack = 10
-num_file = 6
+max_stack = 11
+num_pile = 6
 observe_inbounds = True
 if observe_inbounds:
-    s_shape = (max_stack, num_file + 1)
+    s_shape = (max_stack, num_pile + 1)
 else:
-    s_shape = (max_stack, num_file)
+    s_shape = (max_stack, num_pile)
 s_size = s_shape[0] * s_shape[1]
-a_size = num_file
+a_size = num_pile
 load_model = False
-model_path = './model/a3c/%d-%d' % s_shape
-frame_path = './frames/a3c/%d-%d' % s_shape
-summary_path = './summary/a3c/%d-%d' % s_shape
+model_path = '../models/a3c/%d-%d' % s_shape
+frame_path = '../frames/a3c/%d-%d' % s_shape
+summary_path = '../summary/a3c/%d-%d' % s_shape
 tf.reset_default_graph()
 
 if not os.path.exists(model_path):
@@ -304,7 +304,7 @@ with tf.device("/cpu:0"):
     workers = []
     # Create worker classes
     for i in range(num_workers):
-        locating = Locating(max_stack=max_stack, num_pile=num_file, inbound_plates=inbounds,
+        locating = Locating(max_stack=max_stack, num_pile=num_pile, inbound_plates=inbounds,
                            observe_inbounds=observe_inbounds, display_env=False)
         workers.append(Worker(locating, i, s_size, a_size, trainer, model_path, global_episodes))
     saver = tf.train.Saver(max_to_keep=5)

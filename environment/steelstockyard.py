@@ -1,21 +1,23 @@
-from random import randint
-from environment import plate
 import numpy as np
+import random
 import pygame
 import time
 import environment.plate as plate
 
+random.seed = 42
+
 
 # 강재 적치 위치 결정 환경
 class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 입력
-    def __init__(self, num_pile=4, max_stack=4, inbound_plates=None, display_env=False):
+    def __init__(self, num_pile=4, max_stack=4, inbound_plates=None, observe_inbounds=False, display_env=False):
         self.action_space = num_pile  # 가능한 action 수는 파일의 수로 설정
         self.max_stack = max_stack  # 한 파일에 적치 가능한 강재의 수
-        self.empty = 0  # 빈 공간의 상태 표현 값
+        self.empty = -1  # 빈 공간의 상태 표현 값
         self.stage = 0
         self.current_date = 0
         self.plates = [[] for _ in range(num_pile)]  # 각 파일을 빈 리스트로 초기화
         self.n_features = max_stack * num_pile
+        self.observe_inbounds = observe_inbounds
         # self.yard = np.full([max_stack, num_pile], self.empty)
         if inbound_plates:
             self.inbound_plates = inbound_plates
@@ -33,7 +35,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         inbound = self.inbound_plates.pop(0)  # 입고 강재 리스트 가장 위에서부터 강재를 하나씩 입고
         if len(self.plates[action]) == self.max_stack:  # 적치 강재가 최대 높이를 초과하면 실패로 간주
             done = True
-            reward = -100.0
+            reward = -1.0
         else:
             self.plates[action].append(inbound)  # action 에 따라서 강재를 적치
             reward = self._calculate_reward(action)  # 해당 action 에 대한 보상을 계산
@@ -46,15 +48,16 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         next_state = self._get_state()  # 쌓인 강재들 리스트에서 state 를 계산
         return next_state, reward, done
 
-    def reset(self, episode, hold=True):
+    def reset(self, episode=4, hold=True):
         if not hold:
             #print("generate new schedule")
             self.inbound_plates = plate.generate_schedule()
             self.inbound_clone = self.inbound_plates[:]
         else:
-            #self.inbound_plates = self.inbound_clone[(episode-1) % len(self.inbound_clone)][:]
-            self.inbound_plates = self.inbound_clone[3][:]
+            self.inbound_plates = self.inbound_clone[(episode-1) % len(self.inbound_clone)][:]
+            random.shuffle(self.inbound_plates)
         self.plates = [[] for _ in range(self.action_space)]
+        self.current_date = min(self.inbound_plates, key=lambda x: x.inbound).inbound
         self.stage = 0
         return self._get_state()
 
@@ -78,19 +81,25 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         return reward
 
     def _get_state(self):
-        state = np.full([self.max_stack, self.action_space], self.empty)
-        for i, pile in enumerate(self.plates):
+        if self.observe_inbounds:
+            state = np.full([self.max_stack, self.action_space + 1], self.empty)
+            new_plates = [self.inbound_plates[:self.max_stack][::-1]] + self.plates[:]
+        else:
+            state = np.full([self.max_stack, self.action_space], self.empty)
+            new_plates = self.plates[:]
+        for i, pile in enumerate(new_plates):
             for j, plate in enumerate(pile):
-                state[j, i] = plate.outbound - plate.inbound
-        return state.flatten()
+                state[j, i] = plate.outbound - self.current_date
+        state = np.flipud(state).flatten()
+        return state
 
     def _export_plates(self):
         for pile in self.plates:
-            oubounds = []
+            outbounds = []
             for i, plate in enumerate(pile):
                 if plate.outbound == self.current_date:
-                    oubounds.append(i)
-            for index in oubounds[::-1]:
+                    outbounds.append(i)
+            for index in outbounds[::-1]:
                 del pile[index]
 
 

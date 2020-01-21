@@ -1,8 +1,9 @@
 import pandas as pd
 import scipy.stats as stats
-from random import randint
+import random
 from datetime import datetime
 
+random.seed = 42
 
 def import_plates_schedule(filepath):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
@@ -92,11 +93,13 @@ def import_plates_schedule_by_week(filepath):
 
         if steel_num > 0:
             for i, row in temp.iterrows():
-                plate = Plate(row['자재번호'], row['최근입고일'], row['블록S/C일자'])
+                # plate = Plate(row['자재번호'], row['최근입고일'], row['블록S/C일자'])
+                plate = Plate(row['자재번호'], day - 7, row['블록S/C일자'])  # 주간 물량의 입고 기준일
                 plates_by_week.append(plate)
             plates.append(plates_by_week)
             df_schedule.drop([_ for _ in range(steel_num)], inplace=True)
             df_schedule.reset_index(drop=True, inplace=True)
+        random.shuffle(plates_by_week)
         day += 7
 
     return plates
@@ -141,7 +144,7 @@ class Plate(object):
         self.inbound = inbound
         self.outbound = outbound
         if outbound == -1:  # 강재 데이터가 없으면 임의로 출고일 생성
-            self.outbound = randint(1, 5)
+            self.outbound = random.randint(1, 5)
 
 
 if __name__ == "__main__":

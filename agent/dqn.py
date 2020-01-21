@@ -83,7 +83,7 @@ class DeepQNetwork:
     def _build_net(self):
         # ------------------ build evaluate_net ------------------
         self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
-        self.s_reshaped = tf.reshape(self.s, shape=[-1, int(self.n_features / self.n_actions), self.n_actions, 1])
+        self.s_reshaped = tf.reshape(self.s, shape=[-1, self.feature_size[0], self.feature_size[1], 1])
         self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
 
         with tf.variable_scope('eval_net'):
@@ -107,7 +107,7 @@ class DeepQNetwork:
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'): #23*8
-                w1 = tf.get_variable('w1', [128, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [96, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(conv2_flat, w1) + b1)
 
@@ -130,7 +130,7 @@ class DeepQNetwork:
 
         # ------------------ build target_net ------------------
         self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input
-        self.s_reshaped_ = tf.reshape(self.s_, shape=[-1, int(self.n_features / self.n_actions), self.n_actions, 1])
+        self.s_reshaped_ = tf.reshape(self.s_, shape=[-1, self.feature_size[0], self.feature_size[1], 1])
         with tf.variable_scope('target_net'):
             # c_names(collections_names) are the collections to store variables
             c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
@@ -150,7 +150,7 @@ class DeepQNetwork:
 
             # first layer. collections is used later when assign to target net
             with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [128, n_l1], initializer=w_initializer, collections=c_names)
+                w1 = tf.get_variable('w1', [96, n_l1], initializer=w_initializer, collections=c_names)
                 b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(conv2_flat, w1) + b1)
 
@@ -266,14 +266,14 @@ def run(episodes=1000, update_term=5):
     avg_rewards = []
     for episode in range(1, episodes+1):
         # initial observation
-        observation = env.reset(episode, hold=True)
+        observation = env.reset()
         rs = []
         episode_frames = []
         while True:
             # fresh env
             #env.render()
 
-            episode_frames.append(observation[::-1])
+            episode_frames.append(observation)
 
             # RL choose action based on observation
             action = RL.choose_action(observation)
@@ -295,7 +295,7 @@ def run(episodes=1000, update_term=5):
                 avg_rewards.append(sum(rewards) / len(rewards))
                 break
             step += 1
-        if episode % 100 == 0:
+        if episode % 500 == 0:
             print('episode: {0} finished'.format(episode))
             if not os.path.exists('../frames/dqn'):
                 os.makedirs('../frames/dqn')
@@ -314,15 +314,27 @@ if __name__ == "__main__":
     #inbounds = plate.import_plates_schedule('../environment/data/plate_example1.csv')
     #inbounds = plate.import_plates_schedule_rev('../environment/data/SampleData.csv')
     inbounds = plate.import_plates_schedule_by_week('../environment/data/SampleData.csv')
+    max_stack = 10
+    num_pile = 6
+    observe_inbounds = True
+    if observe_inbounds:
+        s_shape = (max_stack, num_pile + 1)
+    else:
+        s_shape = (max_stack, num_pile)
+    s_size = s_shape[0] * s_shape[1]
+    frame_path = './frames/dqn/%d-%d' % s_shape
+    if not os.path.exists(frame_path):
+        os.makedirs(frame_path)
 
-    env = ssy.Locating(max_stack=8, num_pile=8, inbound_plates=inbounds, display_env=False)
+    env = ssy.Locating(max_stack=max_stack, num_pile=num_pile, inbound_plates=inbounds,
+                       observe_inbounds=observe_inbounds, display_env=False)
 
-    RL = DeepQNetwork(env.action_space, env.n_features, (env.max_stack, env.action_space),
-                      learning_rate=0.001,
-                      reward_decay=1,
+    RL = DeepQNetwork(env.action_space, s_size, s_shape,
+                      learning_rate=5e-5,
+                      reward_decay=0.99,
                       e_greedy=0.9,
                       replace_target_iter=200,
-                      memory_size=20000,
+                      memory_size=200000,
                       #e_greedy_increment=0.01,
                       output_graph=False
                       )
