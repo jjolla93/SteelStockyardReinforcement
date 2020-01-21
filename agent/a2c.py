@@ -191,8 +191,8 @@ class Critic(object):
 
 
 def plot_reward(rewards):
-    if not os.path.exists('../summary/a2c'):
-        os.makedirs('../summary/a2c')
+    if not os.path.exists('../summary/a2c/{0}_{1}/'.format(s_shape[0], s_shape[1])):
+        os.makedirs('../summary/a2c/{0}_{1}/'.format(s_shape[0], s_shape[1]))
     import csv
     f = open('../summary/a2c/{0}_{1}/rewards_{2}_{3}.csv'.
              format(s_shape[0], s_shape[1], env.action_space, env.max_stack), 'w', encoding='utf-8')
@@ -283,4 +283,4 @@ if __name__ == "__main__":
 
     sess.run(tf.global_variables_initializer())
 
-    run(30000)
+    run(1000)
