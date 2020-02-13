@@ -212,12 +212,10 @@ def run(episodes=1000):
     rewards = []
     avg_rewards = []
     for episode in range(1, episodes+1):
-        s = env.reset(episode, hold=True)
+        s = env.reset(episode)
         rs = []
         episode_frames = []
         while True:
-            #if RENDER: env.render()
-
             episode_frames.append(s)
 
             a = actor.choose_action(s)
@@ -235,7 +233,7 @@ def run(episodes=1000):
                 break
             step += 1
 
-        if episode % 100 == 0:
+        if episode % 1000 == 0:
             print('episode: {0} finished'.format(episode))
             if not os.path.exists('../frames/a2c'):
                 os.makedirs('../frames/a2c')
@@ -283,4 +281,4 @@ if __name__ == "__main__":
 
     sess.run(tf.global_variables_initializer())
 
-    run(1000)
+    run(30000)

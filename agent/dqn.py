@@ -270,9 +270,6 @@ def run(episodes=1000, update_term=5):
         rs = []
         episode_frames = []
         while True:
-            # fresh env
-            #env.render()
-
             episode_frames.append(observation)
 
             # RL choose action based on observation

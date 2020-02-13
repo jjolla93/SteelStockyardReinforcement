@@ -242,7 +242,7 @@ class Worker():
 
                     # Periodically save gifs of episodes, model parameters, and summary statistics.
                     if episode_count % 5 == 0 and episode_count != 0:
-                        if self.name == 'worker_0' and episode_count % 250 == 0:
+                        if self.name == 'worker_0' and episode_count % 20 == 0:
                             save_gif(episode_frames, s_shape, episode_count, 'a3c')
                         if episode_count % 250 == 0 and self.name == 'worker_0':
                             saver.save(sess, self.model_path + '/model-' + str(episode_count) + '.cptk')
@@ -268,12 +268,13 @@ class Worker():
                     episode_count += 1
 
 
-inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
+#inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
+inbounds = import_plates_schedule_rev('../environment/data/SampleData.csv')
 max_episode_length = 300
 max_episode = 50000
 gamma = .99  # discount rate for advantage estimation and reward discounting
-max_stack = 11
-num_pile = 6
+max_stack = 15
+num_pile = 20
 observe_inbounds = True
 if observe_inbounds:
     s_shape = (max_stack, num_pile + 1)

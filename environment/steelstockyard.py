@@ -55,7 +55,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
             self.inbound_clone = self.inbound_plates[:]
         else:
             self.inbound_plates = self.inbound_clone[(episode-1) % len(self.inbound_clone)][:]
-            random.shuffle(self.inbound_plates)
+            #random.shuffle(self.inbound_plates)
         self.plates = [[] for _ in range(self.action_space)]
         self.current_date = min(self.inbound_plates, key=lambda x: x.inbound).inbound
         self.stage = 0
@@ -83,7 +83,8 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
     def _get_state(self):
         if self.observe_inbounds:
             state = np.full([self.max_stack, self.action_space + 1], self.empty)
-            new_plates = [self.inbound_plates[:self.max_stack][::-1]] + self.plates[:]
+            daily_plate = [plate for plate in self.inbound_plates[:self.max_stack] if plate.inbound == self.current_date]
+            new_plates = [daily_plate[::-1]] + self.plates[:]
         else:
             state = np.full([self.max_stack, self.action_space], self.empty)
             new_plates = self.plates[:]
