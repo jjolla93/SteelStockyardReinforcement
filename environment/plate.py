@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import scipy.stats as stats
 import random
 from datetime import datetime
@@ -106,33 +107,32 @@ def import_plates_schedule_by_week(filepath):
 
 
 def import_plates_schedule_by_day(filepath):
-    df_schedule = pd.read_csv(filepath, encoding='euc-kr')
-    df_schedule.dropna(subset=['자재번호', '최근입고일', '블록S/C일자'], inplace=True)
-    df_schedule['최근입고일'] = pd.to_datetime(df_schedule['최근입고일'], format='%Y.%m.%d')
-    df_schedule['블록S/C일자'] = pd.to_datetime(df_schedule['블록S/C일자'], format='%Y.%m.%d')
-    df_schedule = df_schedule[df_schedule['최근입고일'] >= datetime(2019, 1, 1)]
-    df_schedule = df_schedule[df_schedule['최근입고일'] <= df_schedule['블록S/C일자']]
-    initial_date = df_schedule['최근입고일'].min()
-    df_schedule['최근입고일'] = (df_schedule['최근입고일'] - initial_date).dt.days
-    df_schedule['블록S/C일자'] = (df_schedule['블록S/C일자'] - initial_date).dt.days
-    df_schedule.sort_values(by=['블록S/C일자'], inplace=True)
+    df_schedule = pd.read_excel(filepath, header=[0, 1], encoding='euc-kr')
+    columns = map(lambda x:x[0].replace('\n','') if 'Unnamed' in x[1] else x[0]+'_'+x[1], df_schedule.columns)
+    df_schedule.columns = columns
+    df_schedule.dropna(subset=['자재번호'], inplace=True)
+    df_schedule['불출요구일'] = pd.to_datetime(df_schedule['불출요구일'], format='%Y.%m.%d')
+    initial_date = df_schedule['불출요구일'].min()
+    df_schedule['불출요구일'] = (df_schedule['불출요구일'] - initial_date).dt.days
     df_schedule.reset_index(drop=True, inplace=True)
 
     plates = []
-    day = df_schedule['블록S/C일자'].min()
-    while len(df_schedule) != 0:
+    for (date, yard), group in df_schedule.groupby(['불출요구일', '적치장']):
+        group.reset_index(drop=True, inplace=True)
         plates_by_day = []
-        temp = df_schedule[df_schedule['블록S/C일자'] <= day]
-        steel_num = len(temp)
 
-        if steel_num > 0:
+        priority = 1
+        while len(group) != 0:
+            temp = group[group['절단장비'] == group.iloc[0]['절단장비']]
+            steel_num = len(temp)
             for i, row in temp.iterrows():
-                plate = Plate(row['자재번호'], row['최근입고일'], row['블록S/C일자'])
+                plate = Plate(row['자재번호'], date, date + priority)
                 plates_by_day.append(plate)
-            plates.append(plates_by_day)
-            df_schedule.drop([_ for _ in range(steel_num)], inplace=True)
-            df_schedule.reset_index(drop=True, inplace=True)
-        day += 1
+            group.drop([_ for _ in range(steel_num)], inplace=True)
+            group.reset_index(drop=True, inplace=True)
+            priority += 1
+
+        plates.append(plates_by_day)
 
     return plates
 
@@ -148,7 +148,10 @@ class Plate(object):
 
 
 if __name__ == "__main__":
-    inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
+    inbounds = import_plates_schedule_by_day('../environment/data/강재+불출지시서.xlsx')
+    length = [len(_) for _ in inbounds]
+    print(np.max(length), np.argmax(length))
+    '''
     f = open("../environment/data/plate.txt", 'w')
     for i in range(len(inbounds)):
         f.write(("-" * 50) + "\n")
@@ -158,3 +161,4 @@ if __name__ == "__main__":
             f.write("자재번호: {0}, 최근입고일: {1}, 블록S/C일자: {2}\n".
                     format(inbounds[i][j].id, inbounds[i][j].inbound, inbounds[i][j].outbound))
     f.close()
+    '''

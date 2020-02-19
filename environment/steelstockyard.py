@@ -48,7 +48,7 @@ class Locating(object):  # 생성자에서 파일의 수, 최대 높이 등을 �
         next_state = self._get_state()  # 쌓인 강재들 리스트에서 state 를 계산
         return next_state, reward, done
 
-    def reset(self, episode=4, hold=True):
+    def reset(self, episode=31, hold=True):
         if not hold:
             #print("generate new schedule")
             self.inbound_plates = plate.generate_schedule()

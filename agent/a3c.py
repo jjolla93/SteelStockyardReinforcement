@@ -268,12 +268,13 @@ class Worker():
                     episode_count += 1
 
 
-inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
+#inbounds = import_plates_schedule_by_week('../environment/data/SampleData.csv')
+inbounds = import_plates_schedule_by_day('../environment/data/강재+불출지시서.xlsx')
 max_episode_length = 300
 max_episode = 50000
 gamma = .99  # discount rate for advantage estimation and reward discounting
-max_stack = 11
-num_pile = 6
+max_stack = 10
+num_pile = 4
 observe_inbounds = True
 if observe_inbounds:
     s_shape = (max_stack, num_pile + 1)
